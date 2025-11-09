@@ -21,7 +21,7 @@ CHECK_INTERVAL = 60       # check every 1 minute
 LOG_INTERVAL = 600        # record every 10 minutes when conditions are met
 HOT_TUB_MARKER = 'Hot Tub Thermometer\\'
 HOT_TUB_OFFSET = 159
-SOLAR_MARKER = 'Solar heater\\'
+SOLAR_MARKER = 'waterproof\\'
 SOLAR_OFFSET = 104
 int_pattern = re.compile(r"(\d+),")
 
