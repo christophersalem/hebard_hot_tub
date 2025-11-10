@@ -183,6 +183,30 @@ while True:
         print(f"{now.strftime('%Y-%m-%d %H:%M:%S')}")
 
         delta = temp_solar_surface - temp_hot_tub
+        heater_on = asyncio.run(check_heater_state(heater_ip))
+
+        if heater_on:
+            if pump_on_state:
+                asyncio.run(control_pump(False))
+                pump_on_state = False
+                pump_off_time = now
+                pump_on_time = None
+                action = "OFF"
+                note = "Heater active — pump turned off"
+                print("Heater is ON — overriding solar pump to OFF")
+            else:
+                pump_on_state = False
+                pump_off_time = now
+                pump_on_time = None
+                action = "No Change"
+                note = "Heater active — pump kept off"
+                print("Heater is ON — keeping solar pump OFF")
+
+            print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
+            print(f"[STATUS] 🌙 Pump: OFF\n")
+            send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, action, note, heater_on)
+            time.sleep(interval)
+            continue
 
         if pump_on_state and pump_on_time:
             elapsed_on = (now - pump_on_time).total_seconds() / 60
@@ -190,7 +214,6 @@ while True:
                 print(f"No Change — still within minimum ON time ({elapsed_on:.1f}/{MIN_ON_MINUTES} min)")
                 print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
                 print(f"[STATUS] 🔆 Pump: ON | Current run time: {elapsed_on:.1f} min\n")
-                heater_on = asyncio.run(check_heater_state(heater_ip))
                 send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, True, "No Change", "Within minimum ON time", heater_on)
                 time.sleep(interval)
                 continue
@@ -201,7 +224,6 @@ while True:
                 print(f"No Change — still within minimum OFF time ({elapsed_off:.1f}/{MIN_OFF_MINUTES} min)")
                 print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
                 print(f"[STATUS] 🌙 Pump: OFF | Current off time: {elapsed_off:.1f} min\n")
-                heater_on = asyncio.run(check_heater_state(heater_ip))
                 send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, "No Change", "Within minimum OFF time", heater_on)
                 time.sleep(interval)
                 continue
@@ -235,7 +257,6 @@ while True:
         emoji = "🔆" if pump_on_state else "🌙"
         print(f"[STATUS] {emoji} Pump: {'ON' if pump_on_state else 'OFF'}\n")
 
-        heater_on = asyncio.run(check_heater_state(heater_ip))
         send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, pump_on_state, action, note, heater_on)
         time.sleep(interval)
 
