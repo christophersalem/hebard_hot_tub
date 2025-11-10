@@ -38,7 +38,7 @@ DELTA_OFF = 4.0
 MIN_ON_MINUTES = 30
 MIN_OFF_MINUTES = 20
 
-MAX_TEMP_F = 104.0
+MAX_TEMP_F = 104
 
 SOLAR_LAG_SEC = 0
 lag_steps = max(0, int(round(SOLAR_LAG_SEC / interval)))
@@ -201,17 +201,39 @@ while True:
 
         if temp_hot_tub >= MAX_TEMP_F:
             print(f"Hot tub temperature {temp_hot_tub}°F reached safety limit ({MAX_TEMP_F}°F)")
-            asyncio.run(control_pump(False))
+
+            pump_was_on = bool(pump_on_state)
+            if pump_was_on:
+                asyncio.run(control_pump(False))
+                pump_off_time = now
+                pump_on_time = None
+            else:
+                print("Pump already OFF prior to safety shutdown")
+                if pump_off_time is None:
+                    pump_off_time = now
+
             pump_on_state = False
-            pump_off_time = now
-            pump_on_time = None
 
-            asyncio.run(control_heater(False))
-            heater_on = False
+            heater_was_on = heater_on
+            if heater_was_on:
+                asyncio.run(control_heater(False))
+                heater_on = False
+            else:
+                print("Heater already OFF prior to safety shutdown")
 
-            action = "OFF"
-            note = f"Safety shutdown at {MAX_TEMP_F}°F"
-            print("Safety limit reached — pump and heater turned off")
+            action = "OFF" if pump_was_on else "No Change"
+            note_bits = [f"Safety shutdown at {MAX_TEMP_F}°F"]
+            if pump_was_on:
+                note_bits.append("pump switched off")
+            else:
+                note_bits.append("pump already off")
+            if heater_was_on:
+                note_bits.append("heater switched off")
+            else:
+                note_bits.append("heater already off")
+            note = " — ".join(note_bits)
+
+            print("Safety limit reached — ensuring pump and heater are off")
             print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
             print(f"[STATUS] 🌙 Pump: OFF\n")
             send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, action, note, heater_on)
