@@ -38,6 +38,8 @@ DELTA_OFF = 4.0
 MIN_ON_MINUTES = 30
 MIN_OFF_MINUTES = 20
 
+MAX_TEMP_F = 104.0
+
 SOLAR_LAG_SEC = 0
 lag_steps = max(0, int(round(SOLAR_LAG_SEC / interval)))
 solar_buffer = deque(maxlen=lag_steps + 1)
@@ -131,6 +133,18 @@ async def control_pump(turn_on: bool):
     else:
         print("Pump state unchanged (already in desired state)")
 
+async def control_heater(turn_on: bool):
+    plug = SmartPlug(heater_ip)
+    await plug.update()
+    if turn_on and not plug.is_on:
+        await plug.turn_on()
+        print("Heater turned ON")
+    elif not turn_on and plug.is_on:
+        await plug.turn_off()
+        print("Heater turned OFF")
+    else:
+        print("Heater state unchanged (already in desired state)")
+
 async def check_heater_state(ip: str) -> bool:
     plug = SmartPlug(ip)
     await plug.update()
@@ -184,6 +198,25 @@ while True:
 
         delta = temp_solar_surface - temp_hot_tub
         heater_on = asyncio.run(check_heater_state(heater_ip))
+
+        if temp_hot_tub >= MAX_TEMP_F:
+            print(f"Hot tub temperature {temp_hot_tub}°F reached safety limit ({MAX_TEMP_F}°F)")
+            asyncio.run(control_pump(False))
+            pump_on_state = False
+            pump_off_time = now
+            pump_on_time = None
+
+            asyncio.run(control_heater(False))
+            heater_on = False
+
+            action = "OFF"
+            note = f"Safety shutdown at {MAX_TEMP_F}°F"
+            print("Safety limit reached — pump and heater turned off")
+            print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
+            print(f"[STATUS] 🌙 Pump: OFF\n")
+            send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, action, note, heater_on)
+            time.sleep(interval)
+            continue
 
         if heater_on:
             if pump_on_state:
