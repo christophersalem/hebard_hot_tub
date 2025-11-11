@@ -28,7 +28,7 @@ heater_ip = "192.168.0.8"  # Kasa plug controlling hot tub heater
 
 HOT_TUB_MARKER = 'Hot Tub Thermometer\\'
 HOT_TUB_OFFSET = 159
-SOLAR_MARKER = 'Solar heater\\'
+SOLAR_MARKER = 'Solar Thermometer\\'
 SOLAR_OFFSET = 104
 
 int_pattern = re.compile(r"(\d+),")
