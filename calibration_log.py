@@ -26,12 +26,6 @@ SOLAR_MARKER = 'Solar Thermometer\\'
 SOLAR_OFFSET = 104
 int_pattern = re.compile(r"(\d+),")
 
-# Weather API Configuration for zip code 95060
-ZIP_CODE = "95060"
-# Coordinates for Santa Cruz, CA (zip 95060): 36.974, -122.031
-LATITUDE = 36.974
-LONGITUDE = -122.031
-
 # ==============================
 # TEMP PARSER
 # ==============================
@@ -47,36 +41,27 @@ def extract_temp_f(output, marker, offset):
     return round((celsius * 9/5) + 32, 2)
 
 # ==============================
-# WEATHER API
+# WEATHER API (Live Observations)
 # ==============================
 def get_local_temperature():
     """
-    Fetch local temperature for zip code 95060 using National Weather Service API.
+    Fetch the current local temperature (°F) from the KMRY station (Monterey Regional Airport).
     Returns temperature in Fahrenheit or None if fetch fails.
     """
+    headers = {"User-Agent": "Hot Tub Controller (contact: hebardiansbehardians@gmail.com)"}
     try:
-        # Use National Weather Service API (free, no key required)
-        headers = {'User-Agent': 'Hot Tub Controller (contact: hebardiansbehardians@gmail.com)'}
-        
-        # Get grid point data for the location
-        point_url = f'https://api.weather.gov/points/{LATITUDE},{LONGITUDE}'
-        point_response = requests.get(point_url, headers=headers, timeout=10)
-        
-        if point_response.status_code == 200:
-            point_data = point_response.json()
-            forecast_url = point_data['properties']['forecastHourly']
-            
-            # Get current temperature from hourly forecast
-            forecast_response = requests.get(forecast_url, headers=headers, timeout=10)
-            
-            if forecast_response.status_code == 200:
-                forecast_data = forecast_response.json()
-                current_temp_f = forecast_data['properties']['periods'][0]['temperature']
-                return round(float(current_temp_f), 2)
+        obs_url = "https://api.weather.gov/stations/KMRY/observations/latest"
+        resp = requests.get(obs_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        props = resp.json()["properties"]
+        temp_c = props["temperature"]["value"]
+        if temp_c is None:
+            return None
+        temp_f = temp_c * 9 / 5 + 32
+        return round(temp_f, 2)
     except Exception as e:
         print(f"[WARN] Could not fetch local temperature: {e}")
-    
-    return None
+        return None
 
 # ==============================
 # LOG FILE SETUP
