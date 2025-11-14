@@ -97,7 +97,6 @@ def send_to_google_sheet(temp_tub, temp_solar, delta, pump_state, action, note, 
         params = {
             "tub": temp_tub,
             "solar": temp_solar,
-            "delta": round(delta, 2),
             "pump": "🔆" if pump_state else "🌙",
             "heater": "🟢" if heater_state else "",
             "action": action,
