@@ -55,7 +55,44 @@ FAILSAFE_THRESHOLD = 3
 # ==============================
 GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzj7hDMnP12V0457VYh3NZiaRR7w3f9fzKaQZr7gAcpN2DdwM-KjUsHbB7HKAAyUCcB/exec"
 
-def send_to_google_sheet(temp_tub, temp_solar, delta, pump_state, action, note, heater_state):
+def format_duration(minutes):
+    """
+    Format duration intelligently based on length:
+    - < 60 min: show in minutes
+    - 1-24 hours: show hours and minutes
+    - >= 24 hours: show days, hours, and minutes
+    """
+    if minutes < 60:
+        return f"{int(minutes)} minutes" if minutes != 1 else "1 minute"
+    
+    hours = minutes / 60
+    if hours < 24:
+        h = int(hours)
+        m = int(minutes % 60)
+        hour_str = f"{h} hour" if h == 1 else f"{h} hours"
+        if m > 0:
+            min_str = f"{m} minute" if m == 1 else f"{m} minutes"
+            return f"{hour_str} {min_str}"
+        return hour_str
+    
+    days = int(hours / 24)
+    remaining_hours = int(hours % 24)
+    remaining_minutes = int(minutes % 60)
+    
+    day_str = f"{days} day" if days == 1 else f"{days} days"
+    parts = [day_str]
+    
+    if remaining_hours > 0:
+        hour_str = f"{remaining_hours} hour" if remaining_hours == 1 else f"{remaining_hours} hours"
+        parts.append(hour_str)
+    
+    if remaining_minutes > 0:
+        min_str = f"{remaining_minutes} minute" if remaining_minutes == 1 else f"{remaining_minutes} minutes"
+        parts.append(min_str)
+    
+    return " ".join(parts)
+
+def send_to_google_sheet(temp_tub, temp_solar, delta, pump_state, action, note, heater_state, duration=""):
     try:
         params = {
             "tub": temp_tub,
@@ -64,7 +101,8 @@ def send_to_google_sheet(temp_tub, temp_solar, delta, pump_state, action, note, 
             "pump": "🔆" if pump_state else "🌙",
             "heater": "🟢" if heater_state else "",
             "action": action,
-            "note": note
+            "note": note,
+            "duration": duration
         }
         requests.get(GOOGLE_SHEET_URL, params=params, timeout=30)
     except Exception as e:
@@ -236,7 +274,14 @@ while True:
             print("Safety limit reached — ensuring pump and heater are off")
             print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
             print(f"[STATUS] 🌙 Pump: OFF\n")
-            send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, action, note, heater_on)
+            
+            # Calculate duration for pump state
+            duration_str = ""
+            if pump_off_time:
+                elapsed_off = (now - pump_off_time).total_seconds() / 60
+                duration_str = format_duration(elapsed_off)
+            
+            send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, action, note, heater_on, duration_str)
             time.sleep(interval)
             continue
 
@@ -259,7 +304,14 @@ while True:
 
             print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
             print(f"[STATUS] 🌙 Pump: OFF\n")
-            send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, action, note, heater_on)
+            
+            # Calculate duration for pump state
+            duration_str = ""
+            if pump_off_time:
+                elapsed_off = (now - pump_off_time).total_seconds() / 60
+                duration_str = format_duration(elapsed_off)
+            
+            send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, action, note, heater_on, duration_str)
             time.sleep(interval)
             continue
 
@@ -269,7 +321,8 @@ while True:
                 print(f"No Change — still within minimum ON time ({elapsed_on:.1f}/{MIN_ON_MINUTES} min)")
                 print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
                 print(f"[STATUS] 🔆 Pump: ON | Current run time: {elapsed_on:.1f} min\n")
-                send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, True, "No Change", "Within minimum ON time", heater_on)
+                duration_str = format_duration(elapsed_on)
+                send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, True, "No Change", "Within minimum ON time", heater_on, duration_str)
                 time.sleep(interval)
                 continue
 
@@ -279,7 +332,8 @@ while True:
                 print(f"No Change — still within minimum OFF time ({elapsed_off:.1f}/{MIN_OFF_MINUTES} min)")
                 print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
                 print(f"[STATUS] 🌙 Pump: OFF | Current off time: {elapsed_off:.1f} min\n")
-                send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, "No Change", "Within minimum OFF time", heater_on)
+                duration_str = format_duration(elapsed_off)
+                send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, "No Change", "Within minimum OFF time", heater_on, duration_str)
                 time.sleep(interval)
                 continue
 
@@ -312,7 +366,16 @@ while True:
         emoji = "🔆" if pump_on_state else "🌙"
         print(f"[STATUS] {emoji} Pump: {'ON' if pump_on_state else 'OFF'}\n")
 
-        send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, pump_on_state, action, note, heater_on)
+        # Calculate duration for pump state
+        duration_str = ""
+        if pump_on_state and pump_on_time:
+            elapsed_on = (now - pump_on_time).total_seconds() / 60
+            duration_str = format_duration(elapsed_on)
+        elif not pump_on_state and pump_off_time:
+            elapsed_off = (now - pump_off_time).total_seconds() / 60
+            duration_str = format_duration(elapsed_off)
+
+        send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, pump_on_state, action, note, heater_on, duration_str)
         time.sleep(interval)
 
     except KeyboardInterrupt:
