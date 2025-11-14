@@ -5,13 +5,15 @@ function doGet(e) {
   var heater = e.parameter['heater']; // 🟢 heater state
   var tub = e.parameter['tub'];
   var solar = e.parameter['solar'];
+  var delta = e.parameter['delta'];
   var action = e.parameter['action'];
   var note = e.parameter['note'];
+  var duration = e.parameter['duration'] || '';
 
   // Insert new row at top (row 2, keeps headers in row 1)
   sheet.insertRowBefore(2);
-  // Now 7 columns: Timestamp | Pump | Heater | Tub | Solar | Action | Note
-  sheet.getRange(2, 1, 1, 7).setValues([[timestamp, pump, heater, tub, solar, action, note]]);
+  // Now 9 columns: Timestamp | Pump | Heater | Tub | Solar | Delta | Action | Note | Duration
+  sheet.getRange(2, 1, 1, 9).setValues([[timestamp, pump, heater, tub, solar, delta, action, note, duration]]);
 
   // Keep max 500 rows (plus header)
   var lastRow = sheet.getLastRow();
