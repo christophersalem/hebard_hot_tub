@@ -53,7 +53,7 @@ FAILSAFE_THRESHOLD = 3
 # ==============================
 # GOOGLE SHEET LOGGING
 # ==============================
-GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzj7hDMnP12V0457VYh3NZiaRR7w3f9fzKaQZr7gAcpN2DdwM-KjUsHbB7HKAAyUCcB/exec"
+GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbxwL2YolxY8-kqUeIHaN6O1MWy9Hnw3LNusNK5Cv56qerCrTxtWx79gtA6sHkEJyOip/exec"
 
 def format_duration(minutes):
     """
