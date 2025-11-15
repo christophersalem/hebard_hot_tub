@@ -23,8 +23,8 @@ from typing import Optional
 # ==============================
 cmd = "govee2mqtt/target/debug/govee serve --govee-email hebardiansbehardians@gmail.com --govee-password 777Markofthebeast!"
 interval = 600  # seconds between readings
-plug_ip = "192.168.0.10"   # Kasa plug controlling solar heater pump
-heater_ip = "192.168.0.8"  # Kasa plug controlling hot tub heater
+plug_ip = "192.168.0.12"   # Kasa plug controlling solar heater pump
+heater_ip = "192.168.0.14"  # Kasa plug controlling hot tub heater
 
 HOT_TUB_MARKER = 'Hot Tub Thermometer\\'
 HOT_TUB_OFFSET = 159

@@ -14,8 +14,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # CONFIG
 # ==============================
 cmd = "govee2mqtt/target/debug/govee serve --govee-email hebardiansbehardians@gmail.com --govee-password 777Markofthebeast!"
-PUMP_IP = "192.168.0.10"
-HEATER_IP = "192.168.0.8"
+PUMP_IP = "192.168.0.12" 
+HEATER_IP = "192.168.0.14"
 
 CHECK_INTERVAL = 60       # check every 1 minute
 LOG_INTERVAL = 600        # record every 10 minutes when conditions are met
