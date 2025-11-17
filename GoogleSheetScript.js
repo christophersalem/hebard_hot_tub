@@ -16,7 +16,7 @@ function doGet(e) {
 
   // Keep max 500 rows (plus header)
   var lastRow = sheet.getLastRow();
-  if (lastRow > 501) sheet.deleteRows(502, lastRow - 501);
+  if (lastRow > 1001) sheet.deleteRows(1002, lastRow - 1001);
 
   return ContentService.createTextOutput("OK");
 }
