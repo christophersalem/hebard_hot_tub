@@ -97,7 +97,7 @@ def _append_state(duration_text, pump_state):
     if pump_state is None or not duration_text:
         return duration_text
     state_label = "ON" if pump_state else "OFF"
-    return f"{duration_text} {state_label}"
+    return f"{state_label} {duration_text}"
 
 def send_to_google_sheet(temp_tub, temp_solar, delta, pump_state, action, note, heater_state, duration=""):
     try:
