@@ -194,11 +194,27 @@ async def check_heater_state(ip: str) -> bool:
     await plug.update()
     return plug.is_on
 
+async def check_pump_state(ip: str) -> bool:
+    plug = SmartPlug(ip)
+    await plug.update()
+    return plug.is_on
+
 # ==============================
 # MAIN LOOP
 # ==============================
 while True:
     try:
+        if pump_on_state is None:
+            initial_state = asyncio.run(check_pump_state(plug_ip))
+            now = datetime.now()
+            pump_on_state = initial_state
+            if initial_state:
+                pump_on_time = now
+                pump_off_time = None
+            else:
+                pump_off_time = now
+                pump_on_time = None
+
         today = datetime.now().date()
         if today != current_log_date:
             log_file.close()
