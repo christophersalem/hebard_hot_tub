@@ -1,3 +1,23 @@
+# Steps to configure a new linux machine
+```bash
+#Clone this repo and cd into it
+
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+sudo apt update
+sudo apt install -y build-essential pkg-config libssl-dev libdbus-1-dev libbluetooth-dev
+curl https://sh.rustup.rs -sSf | sh
+source $HOME/.cargo/env
+
+git clone https://github.com/wez/govee2mqtt.git
+cd govee2mqtt
+cargo build
+  #(this last step takes a while)
+```
+---
+Below is chatGPT's generated README
 # 🌡️ Hot Tub Controller
 
 A Python-based automation script that monitors **hot tub** and **solar heater** temperatures and controls a **Kasa smart plug** to optimize energy use.  
