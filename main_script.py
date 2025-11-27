@@ -50,6 +50,11 @@ pump_off_time = None
 read_fail_count = 0
 FAILSAFE_THRESHOLD = 3
 
+PUMP_ON_EMOJI = "🔆"
+PUMP_OFF_EMOJI = ""
+HEATER_ON_EMOJI = "🟢"
+HEATER_OFF_EMOJI = ""
+
 # ==============================
 # GOOGLE SHEET LOGGING
 # ==============================
@@ -104,8 +109,8 @@ def send_to_google_sheet(temp_tub, temp_solar, delta, pump_state, action, note, 
         params = {
             "tub": temp_tub,
             "solar": temp_solar,
-            "pump": "🔆" if pump_state else "🌙",
-            "heater": "🟢" if heater_state else "",
+            "pump": PUMP_ON_EMOJI if pump_state else PUMP_OFF_EMOJI,
+            "heater": HEATER_ON_EMOJI if heater_state else HEATER_OFF_EMOJI,
             "action": action,
             "note": note,
             "duration": duration
@@ -295,7 +300,7 @@ while True:
 
             print("Safety limit reached — ensuring pump and heater are off")
             print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
-            print(f"[STATUS] 🌙 Pump: OFF\n")
+            print(f"[STATUS] {PUMP_OFF_EMOJI} Pump: OFF\n")
             
             # Calculate duration for pump state
             duration_str = ""
@@ -326,7 +331,7 @@ while True:
                 print("Heater is ON — keeping solar pump OFF")
 
             print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
-            print(f"[STATUS] 🌙 Pump: OFF\n")
+            print(f"[STATUS] {PUMP_OFF_EMOJI} Pump: OFF\n")
             
             # Calculate duration for pump state
             duration_str = ""
@@ -343,7 +348,7 @@ while True:
             if elapsed_on < MIN_ON_MINUTES:
                 print(f"No Change — still within minimum ON time ({elapsed_on:.1f}/{MIN_ON_MINUTES} min)")
                 print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
-                print(f"[STATUS] 🔆 Pump: ON | Current run time: {elapsed_on:.1f} min\n")
+                print(f"[STATUS] {PUMP_ON_EMOJI} Pump: ON | Current run time: {elapsed_on:.1f} min\n")
                 duration_str = format_duration(elapsed_on, pump_state=True)
                 send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, True, "No Change", "Within minimum ON time", heater_on, duration_str)
                 time.sleep(interval)
@@ -354,7 +359,7 @@ while True:
             if elapsed_off < MIN_OFF_MINUTES:
                 print(f"No Change — still within minimum OFF time ({elapsed_off:.1f}/{MIN_OFF_MINUTES} min)")
                 print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
-                print(f"[STATUS] 🌙 Pump: OFF | Current off time: {elapsed_off:.1f} min\n")
+                print(f"[STATUS] {PUMP_OFF_EMOJI} Pump: OFF | Current off time: {elapsed_off:.1f} min\n")
                 duration_str = format_duration(elapsed_off, pump_state=False)
                 send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, "No Change", "Within minimum OFF time", heater_on, duration_str)
                 time.sleep(interval)
@@ -386,7 +391,7 @@ while True:
 
         print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
 
-        emoji = "🔆" if pump_on_state else "🌙"
+        emoji = PUMP_ON_EMOJI if pump_on_state else PUMP_OFF_EMOJI
         print(f"[STATUS] {emoji} Pump: {'ON' if pump_on_state else 'OFF'}\n")
 
         # Calculate duration for pump state
