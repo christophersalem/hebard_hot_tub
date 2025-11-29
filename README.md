@@ -58,11 +58,33 @@ sudo apt install build-essential pkg-config libssl-dev libffi-dev python3-dev ca
 ```
 hot_tub_controller/
 ├── main_script.py              # Primary controller script
+├── pump_state.py               # Pump state persistence module
+├── test_pump_state.py          # Unit tests for state persistence
 ├── requirements.txt            # Python dependencies
 ├── README.md                   # This file
-├── data/                       # Log files (auto-generated)
+├── data/                       # Log files and state (auto-generated)
+│   ├── log_YYYY-MM-DD.txt      # Daily log files
+│   └── pump_state.json         # Persisted pump state
 └── .gitignore                  # Ignore data and venv files
 ```
+
+### Pump State Persistence Format
+
+The controller persists pump state to `data/pump_state.json` to enable correct startup behavior. This file contains:
+
+```json
+{
+  "pump_on": true,
+  "last_changed": "2025-01-15T10:30:00.123456"
+}
+```
+
+- **pump_on**: `true` if pump is on, `false` if off
+- **last_changed**: ISO 8601 timestamp of the last state change
+
+On startup, the controller loads this file to:
+- Use the persisted timestamp for minimum on/off enforcement
+- Skip minimum-off enforcement if the file is missing or corrupted (allowing immediate start)
 
 ---
 

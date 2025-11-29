@@ -21,9 +21,10 @@ from typing import Optional
 
 from pump_state import load_pump_state, save_pump_state
 
-# Configure logging for startup decisions (DEBUG level)
+# Configure logging (INFO level by default, set DEBUG_MODE=1 environment variable for DEBUG level)
+log_level = logging.DEBUG if os.environ.get("DEBUG_MODE") else logging.INFO
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=log_level,
     format='%(asctime)s [%(levelname)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
@@ -60,6 +61,8 @@ pump_on_time = None
 pump_off_time = None
 # Flag to skip minimum-off enforcement on first cycle if no valid persisted timestamp
 skip_min_off_enforcement = False
+# Flag to track if first evaluation cycle has completed
+first_cycle_complete = False
 read_fail_count = 0
 FAILSAFE_THRESHOLD = 3
 
@@ -419,10 +422,13 @@ while True:
                 time.sleep(interval)
                 continue
 
-        # Clear the skip flag after the first evaluation cycle
-        if skip_min_off_enforcement:
-            logger.debug("First evaluation cycle complete, re-enabling min-off enforcement for future cycles")
-            skip_min_off_enforcement = False
+        # Clear the skip flag after the first evaluation cycle completes
+        # This ensures the flag is cleared regardless of whether pump is ON or OFF
+        if not first_cycle_complete:
+            if skip_min_off_enforcement:
+                logger.debug("First evaluation cycle complete, re-enabling min-off enforcement for future cycles")
+                skip_min_off_enforcement = False
+            first_cycle_complete = True
 
         if (pump_on_state is None or not pump_on_state) and delta > DELTA_ON:
             asyncio.run(control_pump(True))
