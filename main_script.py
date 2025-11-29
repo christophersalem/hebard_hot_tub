@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 try:
     from kasa import SmartPlug  # modern version
@@ -17,6 +18,16 @@ import os
 import sys
 import requests
 from typing import Optional
+
+from pump_state import load_pump_state, save_pump_state
+
+# Configure logging for startup decisions (DEBUG level)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 # ==============================
 # CONFIGURATION
@@ -47,6 +58,8 @@ solar_buffer = deque(maxlen=lag_steps + 1)
 pump_on_state = None
 pump_on_time = None
 pump_off_time = None
+# Flag to skip minimum-off enforcement on first cycle if no valid persisted timestamp
+skip_min_off_enforcement = False
 read_fail_count = 0
 FAILSAFE_THRESHOLD = 3
 
@@ -210,15 +223,50 @@ async def check_pump_state(ip: str) -> bool:
 while True:
     try:
         if pump_on_state is None:
-            initial_state = asyncio.run(check_pump_state(plug_ip))
+            # Startup initialization: load persisted state first
             now = datetime.now()
-            pump_on_state = initial_state
-            if initial_state:
-                pump_on_time = now
+            persisted_on, persisted_last_changed = load_pump_state()
+
+            # Get current pump state from the smart plug
+            current_pump_state = asyncio.run(check_pump_state(plug_ip))
+            pump_on_state = current_pump_state
+
+            logger.debug("=== Startup State Initialization ===")
+            logger.debug("Persisted pump_on: %s", persisted_on)
+            logger.debug("Persisted last_changed: %s", persisted_last_changed)
+            logger.debug("Current pump state from plug: %s", current_pump_state)
+            logger.debug("Now: %s", now)
+            logger.debug("MIN_OFF_MINUTES: %s", MIN_OFF_MINUTES)
+            logger.debug("MIN_ON_MINUTES: %s", MIN_ON_MINUTES)
+
+            if current_pump_state:
+                # Pump is currently ON
+                if persisted_on is True and persisted_last_changed is not None:
+                    # Pump was on and we have a valid timestamp - use it
+                    pump_on_time = persisted_last_changed
+                    elapsed = (now - persisted_last_changed).total_seconds() / 60
+                    logger.debug("Pump ON: using persisted on-time, elapsed %.1f minutes", elapsed)
+                else:
+                    # No valid persisted state - assume pump was just turned on
+                    pump_on_time = now
+                    logger.debug("Pump ON: no valid persisted state, setting on-time to now")
                 pump_off_time = None
             else:
-                pump_off_time = now
+                # Pump is currently OFF
+                if persisted_on is False and persisted_last_changed is not None:
+                    # Pump was off and we have a valid timestamp - use it
+                    pump_off_time = persisted_last_changed
+                    elapsed = (now - persisted_last_changed).total_seconds() / 60
+                    logger.debug("Pump OFF: using persisted off-time, elapsed %.1f minutes", elapsed)
+                else:
+                    # No valid persisted state for OFF pump
+                    # Allow immediate start by skipping min_off enforcement on first cycle
+                    pump_off_time = None
+                    skip_min_off_enforcement = True
+                    logger.debug("Pump OFF: no valid persisted state, will skip min-off enforcement on first cycle")
                 pump_on_time = None
+
+            logger.debug("=== End Startup State Initialization ===")
 
         today = datetime.now().date()
         if today != current_log_date:
@@ -242,9 +290,11 @@ while True:
             if read_fail_count >= FAILSAFE_THRESHOLD:
                 print(f"⚠️  {FAILSAFE_THRESHOLD} consecutive read failures — shutting off pump for safety.")
                 asyncio.run(control_pump(False))
+                failsafe_off_time = datetime.now()
                 pump_on_state = False
                 pump_on_time = None
-                pump_off_time = datetime.now()
+                pump_off_time = failsafe_off_time
+                save_pump_state(False, failsafe_off_time)
                 read_fail_count = 0
             time.sleep(interval)
             continue
@@ -269,13 +319,15 @@ while True:
 
             pump_was_on = bool(pump_on_state)
             if pump_was_on:
+                # Only save state when actually transitioning from on→off
                 asyncio.run(control_pump(False))
                 pump_off_time = now
                 pump_on_time = None
+                save_pump_state(False, now)
             else:
                 print("Pump already OFF prior to safety shutdown")
-                if pump_off_time is None:
-                    pump_off_time = now
+                # Don't update pump_off_time if pump was already off
+                # (no state change means no new timestamp)
 
             pump_on_state = False
 
@@ -314,17 +366,18 @@ while True:
 
         if heater_on:
             if pump_on_state:
+                # Only save state when actually transitioning from on→off
                 asyncio.run(control_pump(False))
                 pump_on_state = False
                 pump_off_time = now
                 pump_on_time = None
+                save_pump_state(False, now)
                 action = "OFF"
                 note = "Heater active — pump turned off"
                 print("Heater is ON — overriding solar pump to OFF")
             else:
+                # Pump is already off, don't update pump_off_time
                 pump_on_state = False
-                if pump_off_time is None:
-                    pump_off_time = now
                 pump_on_time = None
                 action = "No Change"
                 note = "Heater active — pump kept off"
@@ -354,7 +407,8 @@ while True:
                 time.sleep(interval)
                 continue
 
-        if (not pump_on_state) and pump_off_time:
+        # Check minimum OFF time enforcement, but skip on first cycle if no valid persisted timestamp
+        if (not pump_on_state) and pump_off_time and not skip_min_off_enforcement:
             elapsed_off = (now - pump_off_time).total_seconds() / 60
             if elapsed_off < MIN_OFF_MINUTES:
                 print(f"No Change — still within minimum OFF time ({elapsed_off:.1f}/{MIN_OFF_MINUTES} min)")
@@ -365,18 +419,26 @@ while True:
                 time.sleep(interval)
                 continue
 
+        # Clear the skip flag after the first evaluation cycle
+        if skip_min_off_enforcement:
+            logger.debug("First evaluation cycle complete, re-enabling min-off enforcement for future cycles")
+            skip_min_off_enforcement = False
+
         if (pump_on_state is None or not pump_on_state) and delta > DELTA_ON:
             asyncio.run(control_pump(True))
             pump_on_state = True
             pump_on_time = now
             pump_off_time = None
+            save_pump_state(True, now)
             action = "ON"
             note = f"Δ > {DELTA_ON}°F → pump turned on"
         elif pump_on_state and delta < DELTA_OFF:
+            # Only update pump_off_time when actually transitioning from on→off
             asyncio.run(control_pump(False))
             pump_on_state = False
             pump_off_time = now
             pump_on_time = None
+            save_pump_state(False, now)
             action = "OFF"
             note = f"Δ < {DELTA_OFF}°F → pump turned off"
         elif not pump_on_state and delta <= 0:
