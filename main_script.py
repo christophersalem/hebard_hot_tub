@@ -61,12 +61,6 @@ HEATER_OFF_EMOJI = ""
 GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbxC2XLYQ5Li2Hm-my_5U9NfPppr8qpck3k4xYb14O06BVwAnPxsv3sSlbe-1WHMvb7p/exec"
 
 def format_duration(minutes, pump_state=None):
-    """
-    Format duration intelligently based on length:
-    - < 60 min: show in minutes
-    - 1-24 hours: show hours and minutes
-    - >= 24 hours: show days, hours, and minutes
-    """
     if minutes < 60:
         base = f"{int(minutes)} minutes" if minutes != 1 else "1 minute"
         return _append_state(base, pump_state)
@@ -220,6 +214,9 @@ while True:
                 pump_off_time = now
                 pump_on_time = None
 
+            # ---- NEW: skip minimum-off logic once (startup only)
+            skip_min_off_once = True
+
         today = datetime.now().date()
         if today != current_log_date:
             log_file.close()
@@ -302,7 +299,6 @@ while True:
             print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
             print(f"[STATUS] {PUMP_OFF_EMOJI} Pump: OFF\n")
             
-            # Calculate duration for pump state
             duration_str = ""
             if pump_off_time:
                 elapsed_off = (now - pump_off_time).total_seconds() / 60
@@ -333,7 +329,6 @@ while True:
             print(f"Hot Tub: {temp_hot_tub}°F | Solar Surface: {temp_solar_surface}°F | Δ = {round(delta, 2)}°F")
             print(f"[STATUS] {PUMP_OFF_EMOJI} Pump: OFF\n")
             
-            # Calculate duration for pump state
             duration_str = ""
             if pump_off_time:
                 elapsed_off = (now - pump_off_time).total_seconds() / 60
@@ -354,7 +349,10 @@ while True:
                 time.sleep(interval)
                 continue
 
-        if (not pump_on_state) and pump_off_time:
+        # ============================
+        # MINIMUM OFF TIME CHECK
+        # ============================
+        if (not pump_on_state) and pump_off_time and not skip_min_off_once:
             elapsed_off = (now - pump_off_time).total_seconds() / 60
             if elapsed_off < MIN_OFF_MINUTES:
                 print(f"No Change — still within minimum OFF time ({elapsed_off:.1f}/{MIN_OFF_MINUTES} min)")
@@ -364,6 +362,10 @@ while True:
                 send_to_google_sheet(temp_hot_tub, temp_solar_surface, delta, False, "No Change", "Within minimum OFF time", heater_on, duration_str)
                 time.sleep(interval)
                 continue
+
+        # ---- Reset skip flag after first cycle
+        if 'skip_min_off_once' in locals() and skip_min_off_once:
+            skip_min_off_once = False
 
         if (pump_on_state is None or not pump_on_state) and delta > DELTA_ON:
             asyncio.run(control_pump(True))
@@ -394,7 +396,6 @@ while True:
         emoji = PUMP_ON_EMOJI if pump_on_state else PUMP_OFF_EMOJI
         print(f"[STATUS] {emoji} Pump: {'ON' if pump_on_state else 'OFF'}\n")
 
-        # Calculate duration for pump state
         duration_str = ""
         if pump_on_state and pump_on_time:
             elapsed_on = (now - pump_on_time).total_seconds() / 60
